@@ -1,28 +1,31 @@
-import subprocess
 import json
-import csv
 import os
+import csv
 
-# NVD API Endpoint
-NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/1.0"
+# Path to Local NVD JSON Database
+CVE_DATABASE_PATH = "data/nvdcve-1.1-recent.json"
 
-def check_cve(package_name):
-    """Check for known CVEs related to a given package using OSV.dev API."""
-    try:
-        query_url = f"{NVD_API_URL}?keyword={package_name}&resultsPerPage=5"
-        result = subprocess.run(["curl", query_url], capture_output=True, text=True)
-        data = json.loads(result.stdout)
-        vulnerabilities = data.get("result", {}).get("CVE_Items", [])
-        
-        if vulnerabilities:
-            return [(v["cve"]["CVE_data_meta"]["ID"], v["cve"]["description"]["description_data"][0]["value"]) for v in vulnerabilities]
-        else:
-            return []
-    except Exception as e:
-        print(f"Error checking CVE for {package_name}: {e}")
+def load_cve_database(json_file):
+    """Load CVE data from a local JSON file."""
+    if not os.path.exists(json_file):
+        print(f"Error: CVE database {json_file} not found.")
         return []
+    
+    with open(json_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("CVE_Items", [])
 
-def scan_dependencies(requirements_file):
+def check_cve_local(package_name, cve_data):
+    """Check if a package has known vulnerabilities in the offline dataset."""
+    vulnerabilities = []
+    for item in cve_data:
+        description = item["cve"]["description"]["description_data"][0]["value"]
+        cve_id = item["cve"]["CVE_data_meta"]["ID"]
+        if package_name.lower() in description.lower():
+            vulnerabilities.append((cve_id, description))
+    return vulnerabilities
+
+def scan_dependencies(requirements_file, cve_data):
     """Read dependencies from requirements.txt and check for vulnerabilities."""
     if not os.path.exists(requirements_file):
         print("Error: requirements.txt file not found.")
@@ -34,7 +37,7 @@ def scan_dependencies(requirements_file):
     results = []
     for package in dependencies:
         print(f"Checking {package} for vulnerabilities...")
-        cves = check_cve(package)
+        cves = check_cve_local(package, cve_data)
         for cve_id, summary in cves:
             results.append([package, cve_id, summary])
     
@@ -56,8 +59,10 @@ def save_results_json(results, output_file="cve_report.json"):
 
 # Example Usage
 if __name__ == "__main__":
+    cve_data = load_cve_database(CVE_DATABASE_PATH)  # Load local CVE database
     requirements_file = "requirements.txt"  # Change if necessary
-    results = scan_dependencies(requirements_file)
+    results = scan_dependencies(requirements_file, cve_data)
+    
     if results:
         save_results_csv(results)
         save_results_json(results)
