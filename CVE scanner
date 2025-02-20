@@ -1,0 +1,65 @@
+import subprocess
+import json
+import csv
+import os
+
+# NVD API Endpoint
+NVD_API_URL = "https://services.nvd.nist.gov/rest/json/cves/1.0"
+
+def check_cve(package_name):
+    """Check for known CVEs related to a given package using OSV.dev API."""
+    try:
+        query_url = f"{NVD_API_URL}?keyword={package_name}&resultsPerPage=5"
+        result = subprocess.run(["curl", query_url], capture_output=True, text=True)
+        data = json.loads(result.stdout)
+        vulnerabilities = data.get("result", {}).get("CVE_Items", [])
+        
+        if vulnerabilities:
+            return [(v["cve"]["CVE_data_meta"]["ID"], v["cve"]["description"]["description_data"][0]["value"]) for v in vulnerabilities]
+        else:
+            return []
+    except Exception as e:
+        print(f"Error checking CVE for {package_name}: {e}")
+        return []
+
+def scan_dependencies(requirements_file):
+    """Read dependencies from requirements.txt and check for vulnerabilities."""
+    if not os.path.exists(requirements_file):
+        print("Error: requirements.txt file not found.")
+        return []
+    
+    with open(requirements_file, "r") as file:
+        dependencies = [line.strip().split("==")[0] for line in file if line.strip() and not line.startswith("#")]
+    
+    results = []
+    for package in dependencies:
+        print(f"Checking {package} for vulnerabilities...")
+        cves = check_cve(package)
+        for cve_id, summary in cves:
+            results.append([package, cve_id, summary])
+    
+    return results
+
+def save_results_csv(results, output_file="cve_report.csv"):
+    """Save CVE scan results to a CSV file."""
+    with open(output_file, "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["Package", "CVE ID", "Description"])
+        writer.writerows(results)
+    print(f"✅ CVE report saved to {output_file}")
+
+def save_results_json(results, output_file="cve_report.json"):
+    """Save CVE scan results to a JSON file."""
+    with open(output_file, "w") as file:
+        json.dump([{ "package": r[0], "cve_id": r[1], "description": r[2] } for r in results], file, indent=4)
+    print(f"✅ CVE report saved to {output_file}")
+
+# Example Usage
+if __name__ == "__main__":
+    requirements_file = "requirements.txt"  # Change if necessary
+    results = scan_dependencies(requirements_file)
+    if results:
+        save_results_csv(results)
+        save_results_json(results)
+    else:
+        print("No vulnerabilities found.")
