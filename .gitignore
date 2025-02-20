@@ -172,3 +172,8 @@ cython_debug/
 venv/
 __pycache__/
 *.so
+
+venv/
+__pycache__/
+*.log
+.DS_Store
