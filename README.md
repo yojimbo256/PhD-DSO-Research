@@ -1,4 +1,4 @@
-# PhD-DSo-Research
+# PhD-DSO-Research
 
 This repository hosts the code and documentation related to my PhD research on AI-driven DevSecOps, with a focus on automating compliance and security monitoring within DevOps workflows. The primary objective of this research is to integrate AI-driven tools into the software development pipeline, specifically for continuous integration/continuous deployment (CI/CD) pipelines, ensuring continuous compliance, risk management, and security.
 
